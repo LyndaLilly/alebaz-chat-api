@@ -10,6 +10,25 @@ use Illuminate\Support\Str;
 
 class ClientAuthController extends Controller
 {
+
+    public function me(Request $request)
+    {
+        $client = $request->user();
+
+        return response()->json([
+            'ok'     => true,
+            'client' => [
+                'id'                => $client->id,
+                'email'             => $client->email,
+                'phone'             => $client->phone,
+                'username'          => $client->username,
+                'profile_image'     => $client->profile_image ? url($client->profile_image) : null,
+                'verified'          => (bool) $client->verified,
+                'account_completed' => (bool) $client->account_completed,
+                'onboarding_step'   => (int) $client->onboarding_step,
+            ],
+        ], 200);
+    }
     private int $otpExpiresMinutes     = 10;
     private int $resendCooldownSeconds = 60; // wait 60s between resends
     private int $maxResends            = 5;  // max resends before you block (simple rule)
@@ -336,6 +355,96 @@ class ClientAuthController extends Controller
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
             ],
+        ], 200);
+    }
+
+    public function search(Request $request)
+    {
+        $data = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:120'],
+        ]);
+
+        $me = $request->user();
+
+        $raw = trim($data['q']);
+        $q   = trim($data['q']);
+
+        $base = Client::query()
+            ->where('id', '!=', $me->id)
+            ->where('account_completed', true);
+
+        $displayType = 'username';
+
+        // EMAIL (case-insensitive exact)
+        if (str_contains($q, '@')) {
+            $displayType = 'email';
+            $email       = strtolower($q);
+
+            $base->whereRaw('LOWER(email) = ?', [$email]);
+        }
+        // PHONE
+        else if (preg_match('/^[\d\+\s\-\(\)]+$/', $q)) {
+            $displayType = 'phone';
+
+            $digits = preg_replace('/\D+/', '', $q);
+
+            // normalize common NG inputs into E.164
+            // 080..., 081..., 090... => +2348..., +2349...
+            if (str_starts_with($digits, '0') && strlen($digits) >= 10) {
+                $digits    = ltrim($digits, '0');
+                $phoneE164 = '+234' . $digits;
+            }
+            // 2348... => +2348...
+            else if (str_starts_with($digits, '234')) {
+                $phoneE164 = '+' . $digits;
+            }
+            // already typed +234... (we removed + above)
+            else if (str_starts_with($raw, '+')) {
+                $phoneE164 = '+' . $digits;
+            }
+            // fallback: treat as already international digits, require + prefix
+            else {
+                $phoneE164 = '+' . $digits;
+            }
+
+            $base->where('phone', $phoneE164);
+        }
+        // USERNAME (starts-with, case-insensitive)
+        else {
+            $displayType = 'username';
+            $name        = strtolower($q);
+
+            $base->whereNotNull('username')
+                ->whereRaw('LOWER(username) LIKE ?', [$name . '%']);
+        }
+
+        $results = $base
+            ->limit(10)
+            ->get(['id', 'username', 'email', 'phone', 'profile_image']);
+
+        return response()->json([
+            'ok'         => true,
+            'query_type' => $displayType,
+            'results'    => $results->map(function ($c) use ($displayType) {
+                $display = $displayType === 'email'
+                    ? $c->email
+                    : ($displayType === 'phone'
+                        ? $c->phone
+                        : $c->username);
+
+                // Fallback display if username is null
+                if (! $display) {
+                    $display = $c->username ?: ($c->phone ?: $c->email);
+                }
+
+                return [
+                    'id'            => $c->id,
+                    'display'       => $display,     // show what was searched
+                    'display_type'  => $displayType, // email | phone | username
+                    'username'      => $c->username, // optional helper for confirmation
+                    'profile_image' => $c->profile_image ? url($c->profile_image) : null,
+                ];
+            }),
         ], 200);
     }
 
