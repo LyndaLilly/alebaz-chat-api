@@ -30,7 +30,7 @@ class ClientAuthController extends Controller
         ], 200);
     }
     private int $otpExpiresMinutes     = 10;
-    private int $resendCooldownSeconds = 60;
+    private int $resendCooldownSeconds = 10;
     private int $maxResends            = 5;
 
     public function startEmail(Request $request)
