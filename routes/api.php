@@ -30,3 +30,12 @@ Route::middleware('auth:client')->group(function () {
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store']);
     Route::get('/conversations', [ConversationController::class, 'index']);
 });
+
+
+Route::middleware('auth:client')->group(function () {
+  Route::get('/conversations', [ConversationController::class, 'index']);
+
+  Route::post('/conversations/{conversation}/clear', [ConversationController::class, 'clearForMe']);
+  Route::post('/conversations/{conversation}/hide',  [ConversationController::class, 'hideForMe']);
+  Route::post('/conversations/{conversation}/unhide',  [ConversationController::class, 'unhideForMe']);
+});

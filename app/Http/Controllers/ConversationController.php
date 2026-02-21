@@ -29,7 +29,7 @@ class ConversationController extends Controller
         // remove any leading slashes
         return ltrim($path, '/');
     }
-    
+
     public function createOrGetDm(Request $request)
     {
         $request->validate([
@@ -131,7 +131,8 @@ class ConversationController extends Controller
 
             $conversations = Conversation::query()
                 ->whereHas('participants', function ($q) use ($me) {
-                    $q->where('user_id', $me->id);
+                    $q->where('user_id', $me->id)
+                        ->whereNull('hidden_at'); // ✅ hide chats "deleted" by THIS user only
                 })
                 ->with([
                     'clients:id,username,profile_image',
@@ -177,7 +178,6 @@ class ConversationController extends Controller
                 'message' => $e->getMessage(),
                 'file'    => $e->getFile(),
                 'line'    => $e->getLine(),
-                // full trace is long but useful:
                 'trace'   => $e->getTraceAsString(),
             ]);
 
@@ -185,5 +185,112 @@ class ConversationController extends Controller
                 'message' => 'Server error (check laravel.log)',
             ], 500);
         }
+    }
+
+    public function clearForMe(Conversation $conversation)
+    {
+        $me = auth('client')->user();
+        if (! $me) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $p = ConversationParticipant::where('conversation_id', $conversation->id)
+            ->where('user_id', $me->id)
+            ->first();
+
+        if (! $p) {
+            return response()->json(['message' => 'Not a participant'], 403);
+        }
+
+        $p->cleared_at = now();
+        $p->save();
+
+        return response()->json(['message' => 'Chat cleared for you'], 200);
+    }
+
+    public function hideForMe(Conversation $conversation)
+    {
+        $me = auth('client')->user();
+        if (! $me) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $p = ConversationParticipant::where('conversation_id', $conversation->id)
+            ->where('user_id', $me->id)
+            ->first();
+
+        if (! $p) {
+            return response()->json(['message' => 'Not a participant'], 403);
+        }
+
+        $p->hidden_at = now();
+        $p->save();
+
+        return response()->json(['message' => 'Chat deleted for you'], 200);
+    }
+
+    public function unhideForMe(Conversation $conversation)
+    {
+        $me = auth('client')->user();
+        if (! $me) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $p = ConversationParticipant::where('conversation_id', $conversation->id)
+            ->where('user_id', $me->id)
+            ->first();
+
+        if (! $p) {
+            return response()->json(['message' => 'Not a participant'], 403);
+        }
+
+        $p->hidden_at = null;
+        $p->save();
+
+        return response()->json(['message' => 'Chat restored for you'], 200);
+    }
+
+    public function messages(Conversation $conversation)
+    {
+        $me = auth('client')->user();
+        if (! $me) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        // ✅ Must be a participant AND not hidden (deleted) for this user
+        $participant = ConversationParticipant::where('conversation_id', $conversation->id)
+            ->where('user_id', $me->id)
+            ->first();
+
+        if (! $participant) {
+            return response()->json(['message' => 'Not a participant'], 403);
+        }
+
+        // Optional: if user deleted the chat, don’t allow loading messages
+        if ($participant->hidden_at) {
+            return response()->json(['message' => 'Chat deleted'], 404);
+        }
+
+        $query = Message::query()
+            ->where('conversation_id', $conversation->id);
+
+        // ✅ Clear chat: only show messages after cleared_at for THIS user
+        if ($participant->cleared_at) {
+            $query->where('created_at', '>', $participant->cleared_at);
+        }
+
+        $messages = $query->orderBy('created_at', 'asc')->get();
+
+        return response()->json([
+            'messages' => $messages->map(function ($m) {
+                return [
+                    'id'              => $m->id,
+                    'conversation_id' => $m->conversation_id,
+                    'sender_id'       => $m->sender_id,
+                    'body'            => $m->body,
+                    'created_at'      => $m->created_at,
+                ];
+            }),
+        ], 200);
     }
 }
