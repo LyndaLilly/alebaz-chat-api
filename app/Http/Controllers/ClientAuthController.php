@@ -11,6 +11,25 @@ use Illuminate\Support\Str;
 class ClientAuthController extends Controller
 {
 
+    private function imagePath(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        // if already a full url, extract only the path part
+        if (preg_match('/^https?:\/\//i', $path)) {
+            $p    = parse_url($path, PHP_URL_PATH) ?: '';
+            $path = ltrim($p, '/');
+        }
+
+        // remove leading "public/" if it exists
+        $path = preg_replace('#^public/#', '', $path);
+
+        // remove any leading slashes
+        return ltrim($path, '/');
+    }
+
     public function me(Request $request)
     {
         $client = $request->user();
@@ -22,13 +41,14 @@ class ClientAuthController extends Controller
                 'email'             => $client->email,
                 'phone'             => $client->phone,
                 'username'          => $client->username,
-                'profile_image'     => $client->profile_image ? url($client->profile_image) : null,
+                'profile_image'     => $client->profile_image,
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
             ],
         ], 200);
     }
+
     private int $otpExpiresMinutes     = 10;
     private int $resendCooldownSeconds = 10;
     private int $maxResends            = 5;
@@ -241,7 +261,7 @@ class ClientAuthController extends Controller
             'ok'              => true,
             'message'         => 'Profile saved',
             'username'        => $client->username,
-            'profile_image'   => $client->profile_image ? url($client->profile_image) : null,
+            'profile_image'   => $client->profile_image,
             'onboarding_step' => $client->onboarding_step,
         ], 200);
     }
@@ -351,7 +371,7 @@ class ClientAuthController extends Controller
                 'email'             => $client->email,
                 'phone'             => $client->phone,
                 'username'          => $client->username,
-                'profile_image'     => $client->profile_image ? url($client->profile_image) : null,
+                'profile_image'     => $client->profile_image,
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
@@ -443,7 +463,7 @@ class ClientAuthController extends Controller
                     'display'       => $display,     // show what was searched
                     'display_type'  => $displayType, // email | phone | username
                     'username'      => $c->username, // optional helper for confirmation
-                    'profile_image' => $c->profile_image ? url($c->profile_image) : null,
+                    'profile_image' => $c->profile_image,
                 ];
             }),
         ], 200);
