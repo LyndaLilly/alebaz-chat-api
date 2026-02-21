@@ -41,7 +41,7 @@ class ClientAuthController extends Controller
                 'email'             => $client->email,
                 'phone'             => $client->phone,
                 'username'          => $client->username,
-                'profile_image'     => $client->profile_image,
+                'profile_image' => $this->imagePath($client->profile_image),
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
@@ -261,7 +261,7 @@ class ClientAuthController extends Controller
             'ok'              => true,
             'message'         => 'Profile saved',
             'username'        => $client->username,
-            'profile_image'   => $client->profile_image,
+            'profile_image' => $this->imagePath($client->profile_image),
             'onboarding_step' => $client->onboarding_step,
         ], 200);
     }
@@ -371,7 +371,7 @@ class ClientAuthController extends Controller
                 'email'             => $client->email,
                 'phone'             => $client->phone,
                 'username'          => $client->username,
-                'profile_image'     => $client->profile_image,
+                'profile_image' => $this->imagePath($client->profile_image),
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
@@ -463,7 +463,7 @@ class ClientAuthController extends Controller
                     'display'       => $display,     // show what was searched
                     'display_type'  => $displayType, // email | phone | username
                     'username'      => $c->username, // optional helper for confirmation
-                    'profile_image' => $c->profile_image,
+                    'profile_image' => $this->imagePath($c->profile_image),
                 ];
             }),
         ], 200);

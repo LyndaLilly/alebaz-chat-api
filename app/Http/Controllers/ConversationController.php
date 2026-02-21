@@ -10,6 +10,26 @@ use Illuminate\Support\Facades\Log;
 
 class ConversationController extends Controller
 {
+
+    private function imagePath(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        // if already a full url, extract only the path part
+        if (preg_match('/^https?:\/\//i', $path)) {
+            $p    = parse_url($path, PHP_URL_PATH) ?: '';
+            $path = ltrim($p, '/');
+        }
+
+        // remove leading "public/" if it exists
+        $path = preg_replace('#^public/#', '', $path);
+
+        // remove any leading slashes
+        return ltrim($path, '/');
+    }
+    
     public function createOrGetDm(Request $request)
     {
         $request->validate([
@@ -138,7 +158,7 @@ class ConversationController extends Controller
                     'other'        => $other ? [
                         'id'            => $other->id,
                         'username'      => $other->username,
-                        'profile_image' => $other->profile_image ? url($other->profile_image) : null,
+                        'profile_image' => $this->imagePath($other->profile_image),
                     ] : null,
                     'last_message' => $c->latestMessage ? [
                         'body'       => $c->latestMessage->body,
