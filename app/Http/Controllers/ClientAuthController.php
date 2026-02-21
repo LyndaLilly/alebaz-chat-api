@@ -30,10 +30,9 @@ class ClientAuthController extends Controller
         ], 200);
     }
     private int $otpExpiresMinutes     = 10;
-    private int $resendCooldownSeconds = 60; // wait 60s between resends
-    private int $maxResends            = 5;  // max resends before you block (simple rule)
+    private int $resendCooldownSeconds = 60;
+    private int $maxResends            = 5;
 
-    // STEP 1: start email -> create client + send OTP
     public function startEmail(Request $request)
     {
         $data = $request->validate([
@@ -53,32 +52,27 @@ class ClientAuthController extends Controller
             'account_completed'               => false,
         ]);
 
-        $mailSent = true;
-
         try {
             Mail::to($client->email)->send(
                 new ClientVerificationMail($client->email, $code, $this->otpExpiresMinutes)
             );
         } catch (\Throwable $e) {
-            $mailSent = false;
             logger()->error("MAIL FAILED for {$client->email}: " . $e->getMessage());
+
+            // Optional: if you don't want to keep accounts that couldn't get email
+            // $client->delete();
+
+            return response()->json([
+                'ok'      => false,
+                'message' => 'Failed to send verification email. Please try again.',
+            ], 500);
         }
 
-        $response = [
-            'ok'        => true,
-            'message'   => $mailSent
-                ? 'Verification code sent to email'
-                : 'Email failed to send, but code was generated (dev)',
-            'email'     => $client->email,
-            'mail_sent' => $mailSent,
-        ];
-
-        // ✅ show OTP only in debug/dev
-        if (config('app.debug')) {
-            $response['dev_code'] = $code;
-        }
-
-        return response()->json($response, 201);
+        return response()->json([
+            'ok'      => true,
+            'message' => 'Verification code sent to email',
+            'email'   => $client->email,
+        ], 201);
     }
 
     public function verifyEmail(Request $request)
@@ -162,7 +156,6 @@ class ClientAuthController extends Controller
             ], 404);
         }
 
-        // Simple block after too many resends
         if ((int) $client->email_verification_resend_count >= $this->maxResends) {
             return response()->json([
                 'ok'      => false,
@@ -170,7 +163,6 @@ class ClientAuthController extends Controller
             ], 429);
         }
 
-        // Cooldown check
         if ($client->email_verification_last_sent_at) {
             $seconds = now()->diffInSeconds($client->email_verification_last_sent_at);
             if ($seconds < $this->resendCooldownSeconds) {
@@ -191,15 +183,24 @@ class ClientAuthController extends Controller
             'email_verification_resend_count' => ((int) $client->email_verification_resend_count) + 1,
         ]);
 
-        Mail::to($client->email)
-            ->send(new ClientVerificationMail($client->email, $code, $this->otpExpiresMinutes));
+        try {
+            Mail::to($client->email)->send(
+                new ClientVerificationMail($client->email, $code, $this->otpExpiresMinutes)
+            );
+        } catch (\Throwable $e) {
+            logger()->error("RESEND MAIL FAILED for {$client->email}: " . $e->getMessage());
+
+            return response()->json([
+                'ok'      => false,
+                'message' => 'Failed to resend verification email. Please try again.',
+            ], 500);
+        }
 
         return response()->json([
             'ok'      => true,
             'message' => 'Verification code resent to email',
             'email'   => $client->email,
         ], 200);
-
     }
 
     public function saveProfile(Request $request)
