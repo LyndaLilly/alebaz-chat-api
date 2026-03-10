@@ -2,15 +2,15 @@
 
      return [
 
-         'paths' => ['api/*', 'sanctum/csrf-cookie'],
+        'paths' => ['api/*', 'broadcasting/auth', 'sanctum/csrf-cookie'],
 
          'allowed_methods'   => ['*'],
 
          'allowed_origins'  => [
              'https://alebaz.com',
              'https://www.alebaz.com',
-              'https://osita.com.ng',
-             'https://www.osita.com.ng',
+             'http://localhost:5173',      
+             'http://127.0.0.1:5173',   
 
          ],
 

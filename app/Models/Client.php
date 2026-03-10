@@ -13,6 +13,7 @@ class Client extends Authenticatable
 
     protected $fillable = [
         'email',
+        'pending_email',
         'phone',
         'username',
         'profile_image',
@@ -24,12 +25,19 @@ class Client extends Authenticatable
         'email_verification_resend_count',
         'email_verified_at',
 
+        'email_change_code',
+        'email_change_expires_at',
+
         'phone_verification_code',
         'phone_verified_at',
 
         'verified',
         'account_completed',
         'onboarding_step',
+        'user_type',
+        'seller_id',
+        'buyer_id',
+        'is_pro',
     ];
 
     protected $hidden = [
@@ -45,6 +53,7 @@ class Client extends Authenticatable
         'verified'          => 'boolean',
         'account_completed' => 'boolean',
         'onboarding_step'   => 'integer',
+        'is_pro'            => 'boolean',
     ];
 
     public function conversationParticipants()

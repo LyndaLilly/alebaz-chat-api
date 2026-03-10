@@ -7,9 +7,8 @@ return [
         'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
     ],
 
-
-    'guards' => [
-        'web' => [
+    'guards'           => [
+        'web'    => [
             'driver'   => 'session',
             'provider' => 'users',
         ],
@@ -17,8 +16,12 @@ return [
             'driver'   => 'sanctum',
             'provider' => 'clients',
         ],
-    ],
 
+        'seller' => [
+            'driver'   => 'sanctum',
+            'provider' => 'sellers',
+        ],
+    ],
 
     'providers'        => [
         'users'   => [
@@ -31,13 +34,16 @@ return [
             'model'  => App\Models\Client::class,
         ],
 
+        'sellers' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\Seller::class,
+        ],
+
         // 'users' => [
         //     'driver' => 'database',
         //     'table' => 'users',
         // ],
     ],
-
-   
 
     'passwords'        => [
         'users' => [
