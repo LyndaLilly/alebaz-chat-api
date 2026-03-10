@@ -80,7 +80,7 @@ class MessageController extends Controller
                 Log::info('🧾 returning message urls', [
                     'message_id' => $m->id,
                     'file_path'  => $m->file_path,
-                    'file_url'        => $this->publicFileUrl($m->file_path),
+                    'file_url'        => $this->publicFileUrl($msg->file_path),
                     'app_url'    => config('app.url'),
                 ]);
                 return [
