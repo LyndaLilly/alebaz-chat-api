@@ -80,7 +80,7 @@ class MessageController extends Controller
                 Log::info('🧾 returning message urls', [
                     'message_id' => $m->id,
                     'file_path'  => $m->file_path,
-                    'file_url'        => $this->publicFileUrl($msg->file_path),
+                    'file_url'   => $this->publicFileUrl($m->file_path),
                     'app_url'    => config('app.url'),
                 ]);
                 return [
@@ -97,7 +97,7 @@ class MessageController extends Controller
 
                     'audio_duration'  => $m->audio_duration,
 
-                   'file_url'        => $this->publicFileUrl($msg->file_path),
+                   'file_url'       => $this->publicFileUrl($m->file_path),
                     'file_name'       => $m->file_name,
                     'file_mime'       => $m->file_mime,
                     'file_size'       => $m->file_size,
@@ -317,7 +317,7 @@ class MessageController extends Controller
                 'sender_id'       => $msg->sender_id,
                 'body'            => $msg->body,
                 'message_type'    => $msg->message_type,
-               'file_url'        => $this->publicFileUrl($msg->file_path),
+                'file_url'        => $this->publicFileUrl($msg->file_path),
                 'file_name'       => $msg->file_name,
                 'file_mime'       => $msg->file_mime,
                 'file_size'       => $msg->file_size,
