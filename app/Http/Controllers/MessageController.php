@@ -27,6 +27,20 @@ class MessageController extends Controller
         return ltrim($path, '/');
     }
 
+    private function publicFileUrl(?string $path): ?string
+    {
+        if (! $path) {
+            return null;
+        }
+
+        if (preg_match('/^https?:\/\//i', $path)) {
+            return $path;
+        }
+
+        $path = preg_replace('#^public/#', '', $path);
+        return url('public/' . ltrim($path, '/'));
+    }
+
     public function index(Request $request, Conversation $conversation)
     {
         $me = auth('client')->user();
@@ -66,7 +80,7 @@ class MessageController extends Controller
                 Log::info('🧾 returning message urls', [
                     'message_id' => $m->id,
                     'file_path'  => $m->file_path,
-                    'file_url'   => $m->file_path ? url($m->file_path) : null,
+                    'file_url'        => $this->publicFileUrl($m->file_path),
                     'app_url'    => config('app.url'),
                 ]);
                 return [
@@ -83,11 +97,7 @@ class MessageController extends Controller
 
                     'audio_duration'  => $m->audio_duration,
 
-                    'file_url'        => $m->file_path
-                        ? (preg_match('/^https?:\/\//i', $m->file_path)
-                            ? $m->file_path
-                            : $request->getSchemeAndHttpHost() . '/' . ltrim($m->file_path, '/'))
-                        : null,
+                   'file_url'        => $this->publicFileUrl($msg->file_path),
                     'file_name'       => $m->file_name,
                     'file_mime'       => $m->file_mime,
                     'file_size'       => $m->file_size,
@@ -307,9 +317,7 @@ class MessageController extends Controller
                 'sender_id'       => $msg->sender_id,
                 'body'            => $msg->body,
                 'message_type'    => $msg->message_type,
-                'file_url'        => $msg->file_path
-                    ? (preg_match('/^https?:\/\//i', $msg->file_path) ? $msg->file_path : url($msg->file_path))
-                    : null,
+               'file_url'        => $this->publicFileUrl($msg->file_path),
                 'file_name'       => $msg->file_name,
                 'file_mime'       => $msg->file_mime,
                 'file_size'       => $msg->file_size,
