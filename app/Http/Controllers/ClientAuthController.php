@@ -44,7 +44,8 @@ class ClientAuthController extends Controller
                 'seller_id'         => $client->seller_id,
                 'buyer_id'          => $client->buyer_id,
                 'is_pro'            => (bool) $client->is_pro,
-                'profile_image'     => $client->profile_image,
+                // 'profile_image'     => $client->profile_image,
+                'profile_image'     => $this->imagePath($client->profile_image),
 
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
