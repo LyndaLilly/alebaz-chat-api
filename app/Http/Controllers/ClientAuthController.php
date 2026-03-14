@@ -28,6 +28,39 @@ class ClientAuthController extends Controller
         return ltrim($path, '/');
     }
 
+    private function resolveProfileImageByUserType(Client $client): ?string
+{
+    // normal client account
+    if ($client->user_type === 'client') {
+        return $this->imagePath($client->profile_image);
+    }
+
+    // buyer account
+    if ($client->user_type === 'buyer' && $client->buyer_id) {
+        $buyer = \App\Models\Buyer::with('buyerProfile')->find($client->buyer_id);
+
+        if ($buyer) {
+            $path =
+                $buyer->buyerProfile?->profile_image
+                ?? $buyer->buyerProfile?->image
+                ?? $buyer->profile_image
+                ?? null;
+
+            return $this->imagePath($path);
+        }
+
+        return null;
+    }
+
+    // seller account
+    if ($client->user_type === 'seller' && $client->seller_id) {
+        return $this->imagePath($client->profile_image);
+    }
+
+    // fallback
+    return $this->imagePath($client->profile_image);
+}
+
     public function me(Request $request)
     {
         $client = $request->user();
@@ -44,8 +77,7 @@ class ClientAuthController extends Controller
                 'seller_id'         => $client->seller_id,
                 'buyer_id'          => $client->buyer_id,
                 'is_pro'            => (bool) $client->is_pro,
-                // 'profile_image'     => $client->profile_image,
-                'profile_image'     => $this->imagePath($client->profile_image),
+               'profile_image'     => $this->resolveProfileImageByUserType($client),
 
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
@@ -345,7 +377,7 @@ class ClientAuthController extends Controller
                 'seller_id'         => $client->seller_id,
                 'buyer_id'          => $client->buyer_id,
                 'is_pro'            => (bool) $client->is_pro,
-                'profile_image'     => $this->imagePath($client->profile_image),
+                'profile_image'     => $this->resolveProfileImageByUserType($client),
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
@@ -401,7 +433,7 @@ class ClientAuthController extends Controller
                 'seller_id'         => $client->seller_id,
                 'buyer_id'          => $client->buyer_id,
                 'is_pro'            => (bool) $client->is_pro,
-                'profile_image'     => $this->imagePath($client->profile_image),
+                'profile_image'     => $this->resolveProfileImageByUserType($client),
                 'verified'          => (bool) $client->verified,
                 'account_completed' => (bool) $client->account_completed,
                 'onboarding_step'   => (int) $client->onboarding_step,
@@ -559,7 +591,7 @@ class ClientAuthController extends Controller
                 'email'         => $client->email,
                 'phone'         => $client->phone,
                 'username'      => $client->username,
-                'profile_image' => $this->imagePath($client->profile_image),
+               'profile_image' => $this->resolveProfileImageByUserType($client),
                 'verified'      => (bool) $client->verified,
             ],
         ], 200);
