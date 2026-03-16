@@ -138,7 +138,7 @@ class MessageController extends Controller
         }
 
         $request->validate([
-            'audio'    => ['required', 'file', 'max:10240', 'mimes:webm,ogg,mp3,wav'],
+            'audio'    => ['required', 'file', 'max:10240', 'mimes:webm,ogg,mp3,wav,m4a,aac'],
             'duration' => ['nullable', 'integer', 'min:0', 'max:600'],
         ]);
 
@@ -520,7 +520,7 @@ class MessageController extends Controller
         }
 
         $request->validate([
-            'audio'    => ['required', 'file', 'max:51200', 'mimes:webm,ogg,mp3,wav'],
+            'audio'    => ['required', 'file', 'max:51200', 'mimes:webm,ogg,mp3,wav,m4a,aac'],
             'duration' => ['nullable', 'integer', 'min:0', 'max:7200'],
         ]);
 

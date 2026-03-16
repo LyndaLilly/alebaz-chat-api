@@ -15,10 +15,7 @@ class ChatContextController extends Controller
             'product_id' => ['required','integer'],
         ]);
 
-        $buyerId = auth()->id(); // or auth('client')->id(), depending on your guard
-
-        // ✅ Pull product snapshot from Alebaz DB (recommended)
-        // Replace ProductUpload model/table names with yours
+        $buyerId = auth()->id(); 
         $product = \App\Models\ProductUpload::with('images')
             ->findOrFail($data['product_id']);
 
