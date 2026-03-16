@@ -97,7 +97,7 @@ class MessageController extends Controller
 
                     'audio_duration'  => $m->audio_duration,
 
-                   'file_url'       => $this->publicFileUrl($m->file_path),
+                    'file_url'        => $this->publicFileUrl($m->file_path),
                     'file_name'       => $m->file_name,
                     'file_mime'       => $m->file_mime,
                     'file_size'       => $m->file_size,
@@ -121,80 +121,150 @@ class MessageController extends Controller
         ], 200);
     }
 
-    public function storeVoice(Request $request, Conversation $conversation)
-    {
-        $me = auth('client')->user();
-        if (! $me) {
-            return response()->json(['message' => 'Unauthenticated'], 401);
-        }
-
-        // must be participant
-        $isMember = $conversation->participants()
-            ->where('user_id', $me->id)
-            ->exists();
-
-        if (! $isMember) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
-        $request->validate([
-            'audio'    => ['required', 'file', 'max:10240', 'mimes:webm,ogg,mp3,wav,m4a,aac'],
-            'duration' => ['nullable', 'integer', 'min:0', 'max:600'],
-        ]);
-
-        $file = $request->file('audio');
-
-        $ext  = strtolower($file->getClientOriginalExtension() ?: 'webm');
-        $name = 'voice_' . time() . '_' . uniqid() . '.' . $ext;
-
-        $dir = public_path('uploads/voice');
-        if (! is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-
-        $file->move($dir, $name);
-
-        $relativePath = 'uploads/voice/' . $name;
-
-        $msg = Message::create([
-            'conversation_id' => $conversation->id,
-            'sender_id'       => $me->id,
-            'body'            => null,
-            'message_type'    => 'audio',
-            'audio_path'      => $relativePath,
-            'audio_duration'  => $request->input('duration'),
-            'created_at'      => now(),
-        ]);
-
-        ConversationParticipant::where('conversation_id', $conversation->id)
-            ->where('user_id', '!=', $me->id)
-            ->update([
-                'hidden_at'  => null,
-                'updated_at' => now(),
-            ]);
-
-        $msg->load('sender:id,username,profile_image');
-
-        $recipientIds = ConversationParticipant::where('conversation_id', $conversation->id)
-            ->where('user_id', '!=', $me->id)
-            ->pluck('user_id')
-            ->all();
-
-        broadcast(new \App\Events\MessageSent($msg, $recipientIds))->toOthers();
-
-        return response()->json([
-            'message' => [
-                'id'              => $msg->id,
-                'conversation_id' => $msg->conversation_id,
-                'sender_id'       => $msg->sender_id,
-                'body'            => $msg->body,
-                'message_type'    => $msg->message_type,
-                'audio_url'       => $msg->audio_path ? url($msg->audio_path) : null,
-                'audio_duration'  => $msg->audio_duration,
-                'created_at'      => $msg->created_at,
-            ],
-        ], 201);
+   public function storeVoice(Request $request, Conversation $conversation)
+{
+    $me = auth('client')->user();
+    if (! $me) {
+        return response()->json(['message' => 'Unauthenticated'], 401);
     }
+
+    $isMember = $conversation->participants()
+        ->where('user_id', $me->id)
+        ->exists();
+
+    if (! $isMember) {
+        return response()->json(['message' => 'Forbidden'], 403);
+    }
+
+    Log::info('VOICE upload debug', [
+        'has_file' => $request->hasFile('audio'),
+        'all_files' => array_keys($request->allFiles()),
+        'content_type' => $request->header('Content-Type'),
+    ]);
+
+    $request->validate([
+        'audio' => [
+            'required',
+            'file',
+            'max:10240',
+            function ($attribute, $value, $fail) {
+                $mime = strtolower($value->getMimeType() ?: '');
+                $origExt = strtolower($value->getClientOriginalExtension() ?: '');
+                $guessExt = strtolower($value->guessExtension() ?: '');
+
+                $allowedMimes = [
+                    'audio/webm',
+                    'audio/ogg',
+                    'audio/mpeg',
+                    'audio/mp3',
+                    'audio/wav',
+                    'audio/x-wav',
+                    'audio/mp4',
+                    'audio/x-m4a',
+                    'audio/aac',
+                    'application/octet-stream',
+                ];
+
+                $allowedExts = [
+                    'webm',
+                    'ogg',
+                    'mp3',
+                    'wav',
+                    'm4a',
+                    'aac',
+                    'mp4',
+                ];
+
+                $mimeOk = in_array($mime, $allowedMimes, true);
+                $origExtOk = in_array($origExt, $allowedExts, true);
+                $guessExtOk = in_array($guessExt, $allowedExts, true);
+
+                if (! $mimeOk && ! $origExtOk && ! $guessExtOk) {
+                    $fail('The audio field must be a supported audio file.');
+                }
+            },
+        ],
+        'duration' => ['nullable', 'integer', 'min:0', 'max:600'],
+    ]);
+
+    $file = $request->file('audio');
+
+    Log::info('VOICE file info', [
+        'orig_name' => $file?->getClientOriginalName(),
+        'orig_ext' => $file?->getClientOriginalExtension(),
+        'mime' => $file?->getMimeType(),
+        'guess_ext' => $file?->guessExtension(),
+        'size' => $file?->getSize(),
+    ]);
+
+    $ext = strtolower($file->getClientOriginalExtension() ?: '');
+
+    if (! $ext) {
+        $mime = strtolower($file->getMimeType() ?: '');
+        $guessExt = strtolower($file->guessExtension() ?: '');
+
+        $ext = match (true) {
+            in_array($guessExt, ['webm', 'ogg', 'mp3', 'wav', 'm4a', 'aac', 'mp4'], true) => $guessExt,
+            in_array($mime, ['audio/mp4', 'audio/x-m4a'], true) => 'm4a',
+            $mime === 'audio/aac' => 'aac',
+            in_array($mime, ['audio/mpeg', 'audio/mp3'], true) => 'mp3',
+            in_array($mime, ['audio/wav', 'audio/x-wav'], true) => 'wav',
+            $mime === 'audio/ogg' => 'ogg',
+            $mime === 'audio/webm' => 'webm',
+            default => 'm4a',
+        };
+    }
+
+    $name = 'voice_' . time() . '_' . uniqid() . '.' . $ext;
+
+    $dir = public_path('uploads/voice');
+    if (! is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+
+    $file->move($dir, $name);
+
+    $relativePath = 'uploads/voice/' . $name;
+
+    $msg = Message::create([
+        'conversation_id' => $conversation->id,
+        'sender_id'       => $me->id,
+        'body'            => null,
+        'message_type'    => 'audio',
+        'audio_path'      => $relativePath,
+        'audio_duration'  => $request->input('duration'),
+        'created_at'      => now(),
+    ]);
+
+    ConversationParticipant::where('conversation_id', $conversation->id)
+        ->where('user_id', '!=', $me->id)
+        ->update([
+            'hidden_at'  => null,
+            'updated_at' => now(),
+        ]);
+
+    $msg->load('sender:id,username,profile_image');
+
+    $recipientIds = ConversationParticipant::where('conversation_id', $conversation->id)
+        ->where('user_id', '!=', $me->id)
+        ->pluck('user_id')
+        ->all();
+
+    broadcast(new \App\Events\MessageSent($msg, $recipientIds))->toOthers();
+
+    return response()->json([
+        'message' => [
+            'id'              => $msg->id,
+            'conversation_id' => $msg->conversation_id,
+            'sender_id'       => $msg->sender_id,
+            'body'            => $msg->body,
+            'message_type'    => $msg->message_type,
+            'audio_url'       => $msg->audio_path ? url($msg->audio_path) : null,
+            'audio_duration'  => $msg->audio_duration,
+            'created_at'      => $msg->created_at,
+        ],
+    ], 201);
+}
 
     public function storeFile(Request $request, Conversation $conversation)
     {
