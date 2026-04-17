@@ -76,25 +76,19 @@ class ClientAuthController extends Controller
             'account_completed'               => false,
         ]);
 
+        // ✅ TRY EMAIL BUT NEVER BLOCK FLOW
         try {
             Mail::to($client->email)->send(
                 new ClientVerificationMail($client->email, $code, $this->otpExpiresMinutes)
             );
         } catch (\Throwable $e) {
-            logger()->error("MAIL FAILED for {$client->email}: " . $e->getMessage());
-
-            // Optional: if you don't want to keep accounts that couldn't get email
-            // $client->delete();
-
-            return response()->json([
-                'ok'      => false,
-                'message' => 'Failed to send verification email. Please try again.',
-            ], 500);
+            logger()->error("MAIL FAILED: " . $e->getMessage());
         }
 
+        // ✅ ALWAYS RETURN SUCCESS
         return response()->json([
             'ok'      => true,
-            'message' => 'Verification code sent to email',
+            'message' => 'Account created. If email was not delivered, you can resend code.',
             'email'   => $client->email,
         ], 201);
     }
